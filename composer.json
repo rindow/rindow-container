@@ -1,0 +1,38 @@
+{
+    "name": "rindow/rindow-container",
+    "type": "library",
+    "description": "Light weight Services container with dependency injection and module manager",
+    "keywords": ["rindow","framework","container","di"],
+    "license": "BSD-3-Clause",
+    "require": {
+        "php": ">=5.3.3",
+        "rindow/rindow-stdlib": "*",
+        "interop-phpobjects/lenient-container": "*"
+    },
+    "require-dev": {
+        "rindow/rindow-stdlib": "*",
+        "rindow/rindow-annotation": "*",
+        "interop-phpobjects/lenient-container": "*"
+    },
+    "suggest": {
+        "rindow/rindow-annotation": "When using annotation"
+    },
+    "autoload": {
+        "psr-0": {
+            "Rindow\\Container\\": "src/"
+        }
+    },
+
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://rindow.github.io/rindow-packagist/packages.json",
+            "options": {
+                "ssl": {
+                    "verify_peer": "true"
+                }
+            }
+        }
+    ],
+    "minimum-stability": "dev"
+}
