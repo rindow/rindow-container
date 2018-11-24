@@ -46,6 +46,7 @@ class BagModule
 
 class Test extends TestCase
 {
+    protected static $skip = false;
     protected static $backupEnableMemCache;
     protected static $backupEnableFileCache;
     protected static $backupForceFileCache;
@@ -57,6 +58,9 @@ class Test extends TestCase
         self::$backupEnableFileCache = CacheFactory::$enableFileCache;
         self::$backupForceFileCache  = CacheFactory::$forceFileCache;
         self::$backupFileCachePath   = CacheFactory::$fileCachePath;
+
+        if(!extension_loaded('apcu') && !extension_loaded('apc'))
+            self::$skip = 'Neither apc nor apcu is found';
     }
 
     public static function tearDownAfterClass()
@@ -69,6 +73,10 @@ class Test extends TestCase
 
     public function setUp()
     {
+        if(self::$skip) {
+            $this->markTestSkipped(self::$skip);
+            return;
+        }
         usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
         CacheFactory::clearCache();
         usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
@@ -92,7 +100,17 @@ class Test extends TestCase
 
         );
         return $config;
-     }
+    }
+
+    public function apc_delete($key)
+    {
+        if(extension_loaded('apcu'))
+            apcu_delete($key);
+        elseif(extension_loaded('apc'))
+            apcu_delete($key);
+        else
+            throw new \Exception("apc not found");
+    }
 
     public function testExpiredComponentDefinition()
     {
@@ -102,7 +120,7 @@ class Test extends TestCase
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
         CacheFactory::$caches =array();
-        apc_delete('Rindow\Container\ComponentDefinitionManager/\/component/RindowTest\Container\ContainerCacheTest\Bag');
+        $this->apc_delete('Rindow\Container\ComponentDefinitionManager/\/component/RindowTest\Container\ContainerCacheTest\Bag');
 
         $mm = new ModuleManager($this->getConfig());
         $sl = $mm->getServiceLocator();
@@ -118,7 +136,7 @@ class Test extends TestCase
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
         CacheFactory::$caches =array();
-        apc_delete('Rindow\Container\ModuleManager/\/config/staticConfig');
+        $this->apc_delete('Rindow\Container\ModuleManager/\/config/staticConfig');
 
         $mm = new ModuleManager($this->getConfig());
         $sl = $mm->getServiceLocator();
@@ -134,7 +152,7 @@ class Test extends TestCase
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
         CacheFactory::$caches =array();
-        apc_delete('Rindow\Container\ComponentDefinitionManager/\/namedComponent/__COMPONENTS_ARE_LOADED__');
+        $this->apc_delete('Rindow\Container\ComponentDefinitionManager/\/namedComponent/__COMPONENTS_ARE_LOADED__');
 
         $mm = new ModuleManager($this->getConfig());
         $sl = $mm->getServiceLocator();

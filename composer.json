@@ -6,6 +6,7 @@
     "license": "BSD-3-Clause",
     "require": {
         "php": ">=5.3.3",
+        "psr/container": "^1.0",
         "rindow/rindow-stdlib": "*",
         "interop-phpobjects/lenient-container": "*"
     },
