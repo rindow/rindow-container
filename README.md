@@ -1,5 +1,7 @@
 Rindow Container
 ================
+Master: [![Build Status](https://travis-ci.com/rindow/rindow-container.png?branch=master)](https://travis-ci.com/rindow/rindow-container)
+
 Light weight Services container with dependency injection and module manager
 
 This component includs the object container and the module manager.
