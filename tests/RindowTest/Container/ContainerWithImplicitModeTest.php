@@ -4,6 +4,7 @@ namespace RindowTest\Container\ContainerWithImplicitModeTest;
 use PHPUnit\Framework\TestCase;
 use Rindow\Stdlib\Entity\PropertyAccessPolicy;
 use Rindow\Stdlib\Entity\AbstractEntity;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 use Rindow\Annotation\AnnotationManager;
 
 use Rindow\Container\ServiceLocator;
@@ -357,9 +358,6 @@ class Test extends TestCase
 
     public function setUp()
     {
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
     }
 
     public function testConstructor()
@@ -824,8 +822,6 @@ class Test extends TestCase
         $this->assertEquals(null,$i->getArg0());
         $this->assertEquals(DefaultValueClass::VALUE100,$i->getArg1());
 
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
-
         $config = array(
             'implicit_component'=>true,
             'components' => array(
@@ -847,15 +843,15 @@ class Test extends TestCase
     {
         $diConfig = array (
             'implicit_component'=>true,
-            'cache_path' => '/di/cache',
         );
+        $factory = new ConfigCacheFactory(array('enableCache'=>false));
 
-        $di = new Container($diConfig);
+        $di = new Container($diConfig,null,null,null,'/di/path',$factory);
         $i1 = $di->get(__NAMESPACE__.'\\Param1');
         $this->assertEquals(__NAMESPACE__.'\\Param0', get_class($i1->getArg1()));
         unset($di);
 
-        $di2 = new Container($diConfig);
+        $di2 = new Container($diConfig,null,null,null,'/di/path',$factory);
         $i1 = $di2->get(__NAMESPACE__.'\\Param1');
         $this->assertEquals(__NAMESPACE__.'\\Param0', get_class($i1->getArg1()));
     }
@@ -1130,8 +1126,6 @@ class Test extends TestCase
         $i0 = $di->get(__NAMESPACE__.'\PostConstructClass');
         $this->assertEquals(null,$i0->getArg0());
         $this->assertEquals(null,$i0->is_initialized());
-
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
 
         $config = array(
             'implicit_component'=>true,

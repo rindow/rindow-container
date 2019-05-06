@@ -1,7 +1,7 @@
 <?php
 namespace Rindow\Container;
 
-use Rindow\Stdlib\Cache\CacheHandlerTemplate;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 use Rindow\Container\Exception;
 use ArrayObject;
 
@@ -9,33 +9,41 @@ class DeclarationManager
 {
     protected $runtimeComplie = true;
     protected $annotationManager;
-    protected $cacheHandler;
+    protected $configCacheFactory;
     protected $cachePath;
     //protected $enableCache = true;
     protected $declarationCache;
 
-    public function __construct($cachePath=null)
+    public function __construct($cachePath=null,$configCacheFactory=null)
     {
-        if($cachePath==null)
-            $cachePath='';
-        $this->cacheHandler = new CacheHandlerTemplate($cachePath.'DeclarationManager');
-        if(empty($cachePath))
-            $this->cacheHandler->setEnableCache(false);
+        if($cachePath)
+            $this->cachePath = $cachePath;
+        else
+            $this->cachePath = '';
+        if($configCacheFactory)
+            $this->configCacheFactory = $configCacheFactory;
+        else
+            $this->configCacheFactory = new ConfigCacheFactory(array('enableCache'=>false));
+        //$this->configCacheFactory = new configCacheFactoryTemplate($cachePath.'DeclarationManager');
     }
 
     public function setEnableCache($enableCache=true)
     {
-        $this->cacheHandler->setEnableCache($enableCache);
+        $this->configCacheFactory->setEnableCache($enableCache);
     }
 
     public function setCachePath($cachePath)
     {
-        $this->cacheHandler->setCachePath($cachePath);
+        $this->configCacheFactory->setCachePath($cachePath);
     }
 
     public function getDeclarationCache()
     {
-        return $this->cacheHandler->getCache('declaration');
+        if($this->declarationCache==null) {
+            $this->declarationCache = $this->configCacheFactory
+                ->create($this->cachePath.'/DeclarationManager/declaration');
+        }
+        return $this->declarationCache;
     }
 
     public function setRuntimeComplie($complie = true)
@@ -46,22 +54,22 @@ class DeclarationManager
     public function getDeclaration($className)
     {
         $declarationCache = $this->getDeclarationCache();
-        if(isset($declarationCache[$className]))
-            return $declarationCache[$className];
+        if($declarationCache->has($className))
+            return $declarationCache->get($className);
 
         if(!$this->runtimeComplie)
             throw new Exception\DomainException($className.' does not defined',0);
 
         $declaration = $this->complieClassDelaration($className);
 
-        $declarationCache[$className] = $declaration;
+        $declarationCache->set($className,$declaration);
         return $declaration;
     }
 
     public function setDeclaration($className, ComponentDefinition $declaration)
     {
         $declarationCache = $this->getDeclarationCache();
-        $declarationCache[$className] = $declaration;
+        $declarationCache->set($className,$declaration);
     }
 
     public function complieClassDelaration($className)
@@ -89,7 +97,7 @@ class DeclarationManager
             $declarationCache = $this->getDeclarationCache();
             foreach($config['declarations'] as $className => $defConfig) {
                 $declaration = $this->complieClassDelaration($defConfig);
-                $declarationCache[$declaration->getClassName()] = $declaration;
+                $declarationCache->set($declaration->getClassName(),$declaration);
             }
         }
     }

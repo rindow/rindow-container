@@ -3,7 +3,7 @@ namespace RindowTest\Container\ComponentCacheTest;
 
 use PHPUnit\Framework\TestCase;
 use Rindow\Container\ModuleManager;
-use Rindow\Stdlib\Cache\CacheFactory;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 use Rindow\Container\Container;
 use Rindow\Container\Exception\DomainException as ContainerException;
 
@@ -54,10 +54,10 @@ class Test extends TestCase
 
     public static function setUpBeforeClass()
     {
-        self::$backupEnableMemCache  = CacheFactory::$enableMemCache;
-        self::$backupEnableFileCache = CacheFactory::$enableFileCache;
-        self::$backupForceFileCache  = CacheFactory::$forceFileCache;
-        self::$backupFileCachePath   = CacheFactory::$fileCachePath;
+        //self::$backupEnableMemCache  = CacheFactory::$enableMemCache;
+        //self::$backupEnableFileCache = CacheFactory::$enableFileCache;
+        //self::$backupForceFileCache  = CacheFactory::$forceFileCache;
+        //self::$backupFileCachePath   = CacheFactory::$fileCachePath;
 
         if(!extension_loaded('apcu') && !extension_loaded('apc'))
             self::$skip = 'Neither apc nor apcu is found';
@@ -65,10 +65,10 @@ class Test extends TestCase
 
     public static function tearDownAfterClass()
     {
-        CacheFactory::$enableMemCache  = self::$backupEnableMemCache ;
-        CacheFactory::$enableFileCache = self::$backupEnableFileCache;
-        CacheFactory::$forceFileCache  = self::$backupForceFileCache ;
-        CacheFactory::$fileCachePath   = self::$backupFileCachePath  ;
+        //CacheFactory::$enableMemCache  = self::$backupEnableMemCache ;
+        //CacheFactory::$enableFileCache = self::$backupEnableFileCache;
+        //CacheFactory::$forceFileCache  = self::$backupForceFileCache ;
+        //CacheFactory::$fileCachePath   = self::$backupFileCachePath  ;
     }
 
     public function setUp()
@@ -77,9 +77,9 @@ class Test extends TestCase
             $this->markTestSkipped(self::$skip);
             return;
         }
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-        CacheFactory::clearCache();
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
+        //usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
+        //CacheFactory::clearCache();
+        //usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
     }
 
     public function getConfig()
@@ -89,79 +89,119 @@ class Test extends TestCase
                 'modules' => array(
                     __NAMESPACE__.'\BagModule' => true,
                 ),
+                //'enableCache' => true, // Default=true
             ),
             'cache' => array(
                 //'fileCachePath'   => __DIR__.'/../cache',
-                'enableMemCache'  => true,
-                'enableFileCache' => true,
-                'forceFileCache'  => false,
+                'configCache' => array(
+                    'enableMemCache'  => true,
+                    'enableFileCache' => true,
+                    'forceFileCache'  => false,
+                ),
                 //'apcTimeOut'      => 20,
+                'memCache' => array(
+                    'class' => 'Rindow\Stdlib\Cache\SimpleCache\ArrayCache',
+                ),
+                'fileCache' => array(
+                    'class' => 'Rindow\Stdlib\Cache\SimpleCache\ArrayCache',
+                ),
+            ),
+            'container' => array(
+                'component_paths' => array(
+                    __DIR__=>false,
+                ),
             ),
 
         );
         return $config;
     }
 
-    public function apc_delete($key)
-    {
-        if(extension_loaded('apcu'))
-            apcu_delete($key);
-        elseif(extension_loaded('apc'))
-            apcu_delete($key);
-        else
-            throw new \Exception("apc not found");
-    }
+    //public function apc_delete($key)
+    //{
+    //    if(extension_loaded('apcu'))
+    //        apcu_delete($key);
+    //    elseif(extension_loaded('apc'))
+    //        apcu_delete($key);
+    //    else
+    //        throw new \Exception("apc not found");
+    //}
 
     public function testExpiredComponentDefinition()
     {
-        $mm = new ModuleManager($this->getConfig());
+        $config = $this->getConfig();
+        $cacheFactory = new ConfigCacheFactory($config['cache']);
+        $memCache = $cacheFactory->create('')->getPrimary();
+        $this->assertNull($cacheFactory->create('')->getSecondary());
+        $mm = new ModuleManager($config);
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
-        CacheFactory::$caches =array();
-        $this->apc_delete('Rindow\Container\ComponentDefinitionManager/\/component/RindowTest\Container\ContainerCacheTest\Bag');
+        //var_dump($memCache->getAllKeys());
+        $this->assertTrue($memCache->has('Rindow/Container/Container/ComponentDefinitionManager/component/'.__NAMESPACE__.'\Bag'));
+        $memCache->delete('Rindow/Container/Container/ComponentDefinitionManager/component/'.__NAMESPACE__.'\Bag');
 
         $mm = new ModuleManager($this->getConfig());
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
+        $this->assertTrue($memCache->has('Rindow/Container/Container/ComponentDefinitionManager/component/'.__NAMESPACE__.'\Bag'));
     }
 
     public function testExpiredConfig()
     {
-        $mm = new ModuleManager($this->getConfig());
+        $config = $this->getConfig();
+        $cacheFactory = new ConfigCacheFactory($config['cache']);
+        $memCache = $cacheFactory->create('')->getPrimary();
+        $this->assertNull($cacheFactory->create('')->getSecondary());
+        $mm = new ModuleManager($config);
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
-        CacheFactory::$caches =array();
-        $this->apc_delete('Rindow\Container\ModuleManager/\/config/staticConfig');
+        //var_dump($memCache->getAllKeys());
+        $this->assertTrue($memCache->has('Rindow/Container/ModuleManager/config/staticConfig'));
+        $memCache->delete('Rindow/Container/ModuleManager/config/staticConfig');
 
         $mm = new ModuleManager($this->getConfig());
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
+        $this->assertTrue($memCache->has('Rindow/Container/ModuleManager/config/staticConfig'));
     }
 
-    public function testExpiredLoadedFlag()
+    public function testExpiredScannedComponentFlag()
     {
-        $mm = new ModuleManager($this->getConfig());
+        $config = $this->getConfig();
+        $cacheFactory = new ConfigCacheFactory($config['cache']);
+        $memCache = $cacheFactory->create('')->getPrimary();
+        $this->assertNull($cacheFactory->create('')->getSecondary());
+        $mm = new ModuleManager($config);
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
 
-        CacheFactory::$caches =array();
-        $this->apc_delete('Rindow\Container\ComponentDefinitionManager/\/namedComponent/__COMPONENTS_ARE_LOADED__');
+        //var_dump($memCache->getAllKeys());
+        $this->assertTrue($memCache->has('Rindow/Container/Container/ComponentDefinitionManager/scannedComponent/__INITIALIZED__'));
+        $memCache->delete('Rindow/Container/Container/ComponentDefinitionManager/scannedComponent/__INITIALIZED__');
 
         $mm = new ModuleManager($this->getConfig());
+        $mm->setConfigCacheFactory($cacheFactory);
         $sl = $mm->getServiceLocator();
         $bag = $sl->get(__NAMESPACE__.'\Bag');
         $this->assertInstanceof(__NAMESPACE__.'\Piece',$bag->getPiece());
+        $this->assertTrue($memCache->has('Rindow/Container/Container/ComponentDefinitionManager/scannedComponent/__INITIALIZED__'));
     }
 
     public function testMultiContainer()
     {
+        $cacheConfig = $this->getConfig();
+        $cacheFactory = new ConfigCacheFactory($cacheConfig['cache']);
         $config = array(
             'components' => array(
                 'a' => array(
@@ -169,9 +209,9 @@ class Test extends TestCase
                 ),
             ),
         );
-        $container1 = new Container(null,null,null,null,'same-name');   // has "a"
+        $container1 = new Container(null,null,null,null,'same-name',$cacheFactory);   // has "a"
         $container1->setConfig($config);
-        $container2 = new Container(null,null,null,null,'same-name');   // empty
+        $container2 = new Container(null,null,null,null,'same-name',$cacheFactory);   // empty
         // Cacheing 'Not have "a"' at first in "container2".
         // And then try to get "a" in "container1" from cache.
         $container2->setParentManager($container1);
@@ -184,9 +224,9 @@ class Test extends TestCase
         $this->assertTrue($notfound);
 
 
-        $container1 = new Container(null,null,null,null,'cache1-name');   // has "a"
+        $container1 = new Container(null,null,null,null,'cache1-name',$cacheFactory);   // has "a"
         $container1->setConfig($config);
-        $container2 = new Container(null,null,null,null,'cache2-name');   // empty
+        $container2 = new Container(null,null,null,null,'cache2-name',$cacheFactory);   // empty
         // Cacheing 'Not have "a"' at first in "container2".
         // And then try to get "a" in "container1" from other cache.
         $container2->setParentManager($container1);

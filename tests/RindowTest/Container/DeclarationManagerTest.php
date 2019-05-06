@@ -64,7 +64,6 @@ class Test extends TestCase
     public function testNoConstructor()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\Param0');
 
         $injects = $def->getInjects();
@@ -76,7 +75,6 @@ class Test extends TestCase
     public function testConstructorArg1()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\Param1');
 
         $injects = $def->getInjects();
@@ -91,7 +89,6 @@ class Test extends TestCase
     public function testConstructorArg1NonDef()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\Param2');
 
         $injects = $def->getInjects();
@@ -105,7 +102,6 @@ class Test extends TestCase
     public function testConstructorArg2()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\Param3');
 
         $injects = $def->getInjects();
@@ -125,7 +121,6 @@ class Test extends TestCase
     public function testNotExist()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\NotExist');
     }
 
@@ -136,7 +131,6 @@ class Test extends TestCase
     public function testNotDefined()
     {
         $mgr = new DeclarationManager();
-        $mgr->setEnableCache(false);
         $mgr->setRuntimeComplie(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\NotExist');
     }
@@ -145,7 +139,6 @@ class Test extends TestCase
     {
         $mgr = new DeclarationManager();
         $mgr->setAnnotationManager(new AnnotationManager());
-        $mgr->setEnableCache(false);
         $def = $mgr->getDeclaration(__NAMESPACE__.'\NamedInjection');
         $exp = array(
             'class' => __NAMESPACE__.'\\NamedInjection',

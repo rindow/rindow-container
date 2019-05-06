@@ -3,6 +3,7 @@ namespace Rindow\Container;
 
 use Rindow\Container\Exception;
 use Rindow\Stdlib\Entity\PropertyAccessPolicy;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 use Rindow\Annotation\AnnotationManager;
 use Psr\Container\ContainerInterface;
 
@@ -34,16 +35,21 @@ class Container implements ContainerInterface
         ComponentDefinitionManager $componentManager=null,
         DeclarationManager $declarationManager=null,
         InstanceManager $instanceManager=null,
-        $cachePath=null)
+        $cachePath=null,
+        $configCacheFactory=null)
     {
+        if($configCacheFactory==null)
+            $configCacheFactory = new ConfigCacheFactory(array('enableCache'=>false));
+        if($cachePath==null)
+            $cachePath=__CLASS__;
         if($componentManager)
             $this->componentManager = $componentManager;
         else
-            $this->componentManager = new ComponentDefinitionManager($cachePath);
+            $this->componentManager = new ComponentDefinitionManager($cachePath,$configCacheFactory);
         if($declarationManager)
             $this->declarationManager = $declarationManager;
         else
-            $this->declarationManager = new DeclarationManager($cachePath);
+            $this->declarationManager = new DeclarationManager($cachePath,$configCacheFactory);
         if($instanceManager)
             $this->instanceManager = $instanceManager;
         else
@@ -162,16 +168,27 @@ class Container implements ContainerInterface
 
     public function scanComponents()
     {
-        if($this->componentPaths==null)
+        if($this->componentPaths==null) {
+            $this->debug('Component paths is null');
             return $this;
+        }
+        $this->debug('Start Scaning components');
 
         $componentScanner = new ComponentScanner();
         $componentScanner->setAnnotationManager($this->annotationManager);
+        if($this->isDebug) {
+            $this->componentManager->setLogger($this->logger);
+            $this->componentManager->setDebug($this->isDebug);
+            $componentScanner->setLogger($this->logger);
+            $componentScanner->setDebug($this->isDebug);
+        }
         $this->componentManager->attachScanner($componentScanner);
         if($this->proxyManager) {
             $this->proxyManager->attachScanner($componentScanner);
         }
         $componentScanner->scan($this->componentPaths);
+        $this->debug('End scaning components');
+        $this->debug('container: Dump instance names after scaning:',$this->componentManager->getScannedComponentNams());
         return $this;
     }
 
@@ -527,5 +544,12 @@ class Container implements ContainerInterface
     {
         $this->instanceManager->setInstance($componentName,$instance);
         return $this;
+    }
+
+    public function dumpDebug()
+    {
+        if(!$this->isDebug)
+            return;
+        $this->debug('container: Dump instance names:',$this->instanceManager->keys());
     }
 }

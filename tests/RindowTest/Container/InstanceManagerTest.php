@@ -11,7 +11,7 @@ class CreateInstance1
 {
 }
 
-class ServiceManagerTest extends TestCase
+class Test extends TestCase
 {
     public function setUp()
     {

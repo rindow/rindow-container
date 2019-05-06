@@ -2,7 +2,7 @@
 namespace Rindow\Container;
 
 use Rindow\Container\Annotation\Named;
-use Rindow\Stdlib\Cache\CacheHandlerTemplate;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 use Rindow\Container\Exception;
 use ArrayObject;
 
@@ -11,18 +11,27 @@ class ComponentDefinitionManager
     const NAMED_COMPONENT_ANNTATION = 'Rindow\\Container\\Annotation\\Named';
     //const COMPONENTS_ARE_LOADED = '__COMPONENTS_ARE_LOADED__';
     protected $annotationManager;
-    protected $cacheHandler;
+    protected $configCacheFactory;
+    protected $cachePath;
+    protected $componentCache;
+    protected $scannedComponentCache;
     protected $aliases = array();
     protected $ignored;
     public $componentsInConfig;  // *** CAUTION *** Compatibility access level to PHP5.3
+    protected $scannedComponentNames=array(); // For debug;
+    protected $logger;
+    protected $isDebug;
 
-    public function __construct($cachePath=null)
+    public function __construct($cachePath=null,$configCacheFactory=null)
     {
-        if($cachePath==null)
-            $cachePath='';
-        $this->cacheHandler = new CacheHandlerTemplate($cachePath.'ComponentDefinitionManager');
-        if(empty($cachePath))
-            $this->cacheHandler->setEnableCache(false);
+        if($cachePath)
+            $this->cachePath = $cachePath;
+        else
+            $this->cachePath = '';
+        if($configCacheFactory)
+            $this->configCacheFactory = $configCacheFactory;
+        else
+            $this->configCacheFactory = new ConfigCacheFactory(array('enableCache'=>false));
     }
 
     public function setAnnotationManager($annotationManager)
@@ -37,28 +46,57 @@ class ComponentDefinitionManager
 
     public function setEnableCache($enableCache=true)
     {
-        $this->cacheHandler->setEnableCache($enableCache);
+        $this->configCacheFactory->setEnableCache($enableCache);
     }
 
-    public function setCachePath($cachePath)
+    public function setLogger($logger)
     {
-        $this->cacheHandler->setCachePath($cachePath);
+        $this->logger = $logger;
+    }
+
+    public function setDebug($debug)
+    {
+        $this->isDebug = $debug;
+    }
+
+    //public function setCachePath($cachePath)
+    //{
+    //    $this->configCacheFactory->setCachePath($cachePath);
+    //}
+
+    protected function debug($message, array $context = array())
+    {
+        if($this->logger&&$this->isDebug) {
+            $this->logger->debug($message,$context);
+        }
     }
 
     public function getComponentCache()
     {
-        return $this->cacheHandler->getCache('component');
+        if($this->componentCache==null) {
+            $this->componentCache = $this->configCacheFactory
+                ->create($this->cachePath.'/ComponentDefinitionManager/component');
+        }
+        return $this->componentCache;
     }
 
     public function getScannedComponentCache()
     {
-        return $this->cacheHandler->getCache('scannedComponent',$forceFileCache=true);
+        if($this->scannedComponentCache==null) {
+            $this->scannedComponentCache = $this->configCacheFactory
+                ->create($this->cachePath.'/ComponentDefinitionManager/scannedComponent',
+                    $forceFileCache=true);
+        }
+        return $this->scannedComponentCache;
     }
 
     public function attachScanner(ComponentScanner $componentScanner)
     {
-        if($this->hasScanned())
+        $this->debug('ComopentManager: attach scanner');
+        if($this->hasScanned()) {
+            $this->debug('ComopentManager: has scanned. It do not attach.');
             return;
+        }
         $componentScanner->attachCollect(
             self::NAMED_COMPONENT_ANNTATION,
             array($this,'collectNamedComponent'));
@@ -70,7 +108,7 @@ class ComponentDefinitionManager
     public function hasScannedComponent($name)
     {
         $cache = $this->getScannedComponentCache();
-        return isset($cache[$name]);
+        return $cache->has($name);
     }
 
     public function getScannedComponent($name)
@@ -82,24 +120,23 @@ class ComponentDefinitionManager
     public function addScannedComponent($name,$component)
     {
         $cache = $this->getScannedComponentCache();
-        return $cache->put($name,$component);
+        return $cache->set($name,$component);
     }
 
     public function getComponent($componentName,$force=false)
     {
         $components = $this->getComponentCache();
         $manager = $this;
-        $component = $components->get(
+        $component = $components->getEx(
             $componentName,
-            false,
-            function ($cache,$componentName,&$value) use ($force, $manager) {
+            function ($index,$args) {
+                list($componentName, $force, $manager) = $args;
                 $scannedComponent = $manager->getScannedComponent($componentName);
                 if($scannedComponent) {
                     if(is_string($scannedComponent))
-                        $value = new ComponentDefinition($scannedComponent,$manager->getAnnotationManager());
+                        return new ComponentDefinition($scannedComponent,$manager->getAnnotationManager());
                     else
-                        $value = $scannedComponent;
-                    return true;
+                        return $scannedComponent;
                 }
                 if(isset($manager->componentsInConfig[$componentName])) {
                     // When a component in the ComponentCache is expired, it regenarate.
@@ -118,16 +155,14 @@ class ComponentDefinitionManager
                     unset($componentConfig['parent']);
                     if(!isset($componentConfig['class']) && !isset($componentConfig['factory']))
                         $componentConfig['class'] = $componentName;
-                    $value = new ComponentDefinition($componentConfig);
-                    return true;
+                    return new ComponentDefinition($componentConfig);
                 }
                 if($force) {
-                    $value = $manager->newComponent($componentName);
-                    return true;
+                    return $manager->newComponent($componentName);
                 }
-                $value = false;
-                return true;
-            }
+                return false;
+            },
+            array($componentName,$force,$manager)
         );
         return $component;
     }
@@ -141,7 +176,7 @@ class ComponentDefinitionManager
     public function hasComponent($componentName)
     {
         $components = $this->getComponentCache();
-        if(isset($components[$componentName]))
+        if($components->has($componentName))
             return true;
         // When a component in the ComponentCache is expired, it regenarate a component later.
         if(isset($this->componentsInConfig[$componentName]))
@@ -153,12 +188,12 @@ class ComponentDefinitionManager
 
     public function setConfig($config)
     {
-        if(array_key_exists('cache_path',$config)) {
-            $this->setCachePath($config['cache_path']);
-        }
-        if(array_key_exists('enable_cache',$config)) {
-            $this->setEnableCache($config['enable_cache']);
-        }
+        //if(array_key_exists('cache_path',$config)) {
+        //    $this->setCachePath($config['cache_path']);
+        //}
+        //if(array_key_exists('enable_cache',$config)) {
+        //    $this->setEnableCache($config['enable_cache']);
+        //}
         if(isset($config['aliases'])) {
             if(!is_array($config['aliases']))
                 throw new Exception\DomainException('aliases field must be array.');
@@ -180,7 +215,7 @@ class ComponentDefinitionManager
         $componentConfig['name'] = $name;
         if(!isset($componentConfig['class']) && !isset($componentConfig['factory']))
             $componentConfig['class'] = $name;
-        $components[$name] = new ComponentDefinition($componentConfig);
+        $components->set($name,new ComponentDefinition($componentConfig));
     }
 
     public function resolveAlias($alias)
@@ -207,13 +242,13 @@ class ComponentDefinitionManager
     public function hasScanned()
     {
         $cache = $this->getScannedComponentCache();
-        return isset($cache['__INITIALIZED__']);
+        return $cache->has('__INITIALIZED__');
     }
 
     public function completedScan()
     {
         $cache = $this->getScannedComponentCache();
-        $cache['__INITIALIZED__'] = true;
+        $cache->set('__INITIALIZED__','Initialized');
     }
 
     public function collectNamedComponent($annoName,$className,$anno,$classRef)
@@ -225,9 +260,10 @@ class ComponentDefinitionManager
             } else {
                 $name = $anno->value;
             }
-            if(isset($cache[$className]))
+            if($cache->has($className))
                 throw new Exception\DomainException('duplicate component name.: '.$classRef->getFilename().'('.$classRef->getStartLine().')');
-            $cache[$name] = $className;
+            $cache->set($name,$className);
+            $this->scannedComponentNames[$name] = true;
             return true;
         }
         return false;
@@ -243,5 +279,10 @@ class ComponentDefinitionManager
         if($this->componentsInConfig==null)
             return array();
         return array_keys($this->componentsInConfig);
+    }
+
+    public function getScannedComponentNams()
+    {
+        return array_keys($this->scannedComponentNames);
     }
 }

@@ -13,10 +13,22 @@ class ComponentScanner
     protected $completedListener = array();
     protected $collectListener = array();
     protected $onDemandCollectListener = array();
+    protected $isDebug;
+    protected $logger;
 
     public function setAnnotationManager($annotationManager)
     {
         $this->annotationManager = $annotationManager;
+    }
+
+    public function setDebug($debug)
+    {
+        $this->isDebug = $debug;
+    }
+
+    public function setLogger($logger)
+    {
+        $this->logger = $logger;
     }
 
     public function attachCollect($annotationName,$callback)
@@ -27,6 +39,13 @@ class ComponentScanner
     public function attachCompleted($name,$callback)
     {
         $this->completedListener[$name][] = $callback;
+    }
+
+    protected function debug($message, array $context = array())
+    {
+        if($this->logger&&$this->isDebug) {
+            $this->logger->debug($message,$context);
+        }
     }
 
     public function scan(array $paths)
@@ -52,6 +71,7 @@ class ComponentScanner
     {
         if(substr($filename,-4,4)!=='.php')
             return $this;
+        $this->debug('ComponentScanner:scaning '.$filename);
         require_once $filename;
         $parser = new NameSpaceExtractor($filename);
         $classes = $parser->getAllClass();
@@ -68,11 +88,14 @@ class ComponentScanner
     protected function scanClass($class)
     {
         $isComponent = false;
+        $this->debug('ComponentScanner:scaning '.$class);
         $classRef = new ReflectionClass($class);
     
         $annos = $this->annotationManager->getClassAnnotations($classRef);
         foreach ($annos as $anno) {
             $annoName = get_class($anno);
+            $this->debug('ComponentScanner:find annotation "'.$annoName.'" in '.$class);
+
             foreach ($this->collectListener as $name => $callbacks) {
                 if($name == $annoName) {
                     foreach ($callbacks as $callback) {

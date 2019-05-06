@@ -1,18 +1,19 @@
 <?php
 namespace Rindow\Container;
 
-use Rindow\Stdlib\Cache\CacheFactory;
-use Rindow\Stdlib\Cache\CacheHandlerTemplate;
 use Rindow\Stdlib\FileUtil\Dir;
 use ArrayObject;
 
 class ModuleManager
 {
     const DEFAULT_ANNOTATION_MANAGER = 'Rindow\\Annotation\\AnnotationManager';
+    const DEFAULT_CONFIG_FACTORY_CLASS = 'Rindow\\Stdlib\\Cache\\ConfigCache\\ConfigCacheFactory';
     protected $config;
-    protected $cacheHandler;
+    protected $enableCache = true;
+    protected $configCacheFactory;
     protected $mergedConfig;
     protected $cachedConfig;
+    protected $versionCache;
     protected $modules;
     protected $serviceContainer;
     protected $annotationManager;
@@ -23,23 +24,49 @@ class ModuleManager
     {
         $this->config = $config;
         if(!is_array($config) && $config!=null)
-            throw new \Exception('config is not array:'.get_class($config));
-            
-        if(isset($config['cache']))
-            CacheFactory::setConfig($config['cache']);
-        $this->setupCache($config);
+            throw new \Exception('Config mus be array:'.get_class($config));
     }
 
-    protected function setupCache($config)
+    public function setConfigCacheFactory($configCacheFactory)
     {
-        $this->cacheHandler = new CacheHandlerTemplate(__CLASS__);
-        if(isset($config['module_manager']['disable_config_cache'])) {
-            $this->cacheHandler->setEnableCache(false);
+        $this->configCacheFactory = $configCacheFactory;
+    }
+
+    protected function getConfigCacheFactory()
+    {
+        if($this->configCacheFactory)
+            return $this->configCacheFactory;
+        $config = $this->config;
+        $configCacheFactoryClass = null;
+        if(isset($config['module_manager'])) {
+            if(isset($config['module_manager']['enableCache'])&&
+               !isset($config['cache']['enableCache'])) {
+                $config['cache']['enableCache'] = $config['module_manager']['enableCache'];
+            }
+            if(isset($config['module_manager']['configCacheFactoryClass'])) {
+                $configCacheFactoryClass = $config['module_manager']['configCacheFactoryClass'];
+            }
         }
-        if(isset($config['module_manager']['config_cache_path'])) {
-            $this->cacheHandler->setCachePath($config['module_manager']['config_cache_path']);
+        $cacheConfig = null;
+        if(isset($config['cache'])) {
+            $cacheConfig = $config['cache'];
+            if(isset($config['cache']['configCacheFactoryClass'])) {
+                $configCacheFactoryClass = $config['cache']['configCacheFactoryClass'];
+            }
         }
-        $this->cachedConfig = $this->cacheHandler->getCache('config');
+        if($configCacheFactoryClass==null) {
+            $configCacheFactoryClass = self::DEFAULT_CONFIG_FACTORY_CLASS;
+        }
+        $this->configCacheFactory = new $configCacheFactoryClass($cacheConfig);
+        return $this->configCacheFactory;
+    }
+
+    protected function getCachedConfig()
+    {
+        if($this->cachedConfig)
+            return $this->cachedConfig;
+        $this->cachedConfig = $this->getConfigCacheFactory()->create(__CLASS__.'/config');
+        return $this->cachedConfig;
     }
 
     public function _getModules()
@@ -97,30 +124,38 @@ class ModuleManager
             return $this->mergedConfig;
 
         $this->loadModules();
-        $firstLoad = false;
-        $staticConfig = $this->getStaticConfig($firstLoad);
-        $lastVersion = isset($staticConfig['module_manager']['version'])
-            ? $staticConfig['module_manager']['version'] : null;
+
+        $lastVersion = $this->getVersionCache()->get('version','FIRSTLOAD');
         $currentVersion = isset($this->config['module_manager']['version'])
-            ? $this->config['module_manager']['version'] : null;
-        if($lastVersion !== $currentVersion) {
-            CacheFactory::clearCache();
-            $this->setupCache($this->config);
-            $staticConfig = $this->getStaticConfig($tmp);
+            ? $this->config['module_manager']['version'] : 'NONE';
+        if($lastVersion!='FIRSTLOAD' && $lastVersion !== $currentVersion) {
+            $this->getCachedConfig()->clear();
         }
+
+        $staticConfig = $this->getStaticConfig();
+
         $this->mergedConfig = array_replace_recursive(
             $this->getConfigClosure(),
             $staticConfig);
-        if($firstLoad || $lastVersion !== $currentVersion) {
+        if($lastVersion=='FIRSTLOAD' || $lastVersion !== $currentVersion) {
             try {
                 $this->checkDependency($this->mergedConfig);
             } catch(\Exception $e) {
                 $staticConfig['module_manager']['version'] = 'DependencyError';
-                $this->cachedConfig->put('staticConfig',$staticConfig);
+                $this->getCachedConfig()->set('staticConfig',$staticConfig);
                 throw $e;
             }
         }
+        $this->getVersionCache()->set('version',$currentVersion);
         return $this->mergedConfig;
+    }
+
+    protected function getVersionCache()
+    {
+        if($this->versionCache==null) {
+            $this->versionCache = $this->getConfigCacheFactory()->create(__CLASS__.'/lastVersion',$forceFileCache=true);
+        }
+        return $this->versionCache;
     }
 
     public function _getImports()
@@ -137,11 +172,10 @@ class ModuleManager
         return $config;
     }
 
-    protected function getStaticConfig(&$firstLoad)
+    protected function getStaticConfig()
     {
-        $moduleManager = $this;
-        $firstLoad = false;
-        $generator = function ($cache,$key,&$config) use ($moduleManager,&$firstLoad) {
+        $generator = function ($key,$args) {
+            list($moduleManager) = $args;
             $modules = $moduleManager->_getModules();
             if($modules===null)
                 throw new Exception\DomainException('Modules are not loaded.');
@@ -153,10 +187,9 @@ class ModuleManager
             $tmpConfig = array_replace_recursive($tmpConfig,$moduleManager->_getConfig());
             $tmpConfig = array_replace_recursive($tmpConfig,$moduleManager->_getImports());
             $config = $moduleManager->applyFilters($tmpConfig);
-            $firstLoad = true;
-            return true;
+            return $config;
         };
-        return $this->cachedConfig->get('staticConfig',null,$generator);
+        return $this->getCachedConfig()->getEx('staticConfig',$generator,array($this));
     }
 
     protected function getConfigClosure()
@@ -205,7 +238,9 @@ class ModuleManager
                 throw new Exception\DomainException('Container class not found:'.$containerClass);
             $this->serviceContainer = new $containerClass($containerConfig);
         } else {
-            $this->serviceContainer = new Container($containerConfig,null,null,$this->getInstanceManager(),__CLASS__);
+            $this->serviceContainer = new Container(
+                $containerConfig,null,null,$this->getInstanceManager(),
+                null,$this->getConfigCacheFactory());
             $this->serviceContainer->setAnnotationManager($this->getAnnotationManager($config));
         }
         return $this->serviceContainer;
@@ -266,6 +301,7 @@ class ModuleManager
         $config = $this->getConfig();
 
         $serviceContainer = $this->getServiceContainer();
+        $serviceContainer->setInstance('config',$config);
         $aopManager = $this->initAopManager($serviceContainer);
         $annotationManager = $this->getAnnotationManager($config);
         $serviceContainer->scanComponents();
@@ -283,9 +319,11 @@ class ModuleManager
             $serviceContainer->setInstance(get_class($aopManager),$aopManager);
             $componentManager->addAlias('AopManager',get_class($aopManager));
         }
-
-        $serviceContainer->setInstance('config',$config);
-
+        if($this->configCacheFactory) {
+            $serviceContainer->setInstance('ConfigCacheFactory',$this->configCacheFactory);
+            $serviceContainer->setInstance('SimpleCache',$this->configCacheFactory->getMemCache());
+        }
+ 
         foreach($this->modules as $module) {
             if(method_exists($module,'init'))
                 $module->init($this);

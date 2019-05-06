@@ -4,6 +4,7 @@ namespace RindowTest\Container\ModuleManagerTest;
 use PHPUnit\Framework\TestCase;
 use Rindow\Loader\AutoLoader;
 use stdClass;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 
 // Test Target Classes
 use Rindow\Container\ModuleManager;
@@ -34,22 +35,43 @@ class TestCheckDependencyModule
 
 class Test extends TestCase
 {
-    public static $backupCacheMode;
     public static function setUpBeforeClass()
     {
-        self::$backupCacheMode = \Rindow\Stdlib\Cache\CacheFactory::$notRegister;
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
+        $cacheFactory = new \Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory();
+        $cacheFactory->create('',$forceFileCache=true)->clear();
     }
     public static function tearDownAfterClass()
     {
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = self::$backupCacheMode;
+        $cacheFactory = new \Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory();
+        $cacheFactory->create('')->clear();
     }
 
     public function setUp()
     {
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
+        $cacheFactory = new \Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory();
+        $cacheFactory->create('')->clear();
+    }
+
+    public function getCacheConfig()
+    {
+        $config = array(
+            'cache' => array(
+                //'fileCachePath'   => __DIR__.'/../cache',
+                'configCache' => array(
+                    'enableMemCache'  => true,
+                    'enableFileCache' => true,
+                    'forceFileCache'  => false,
+                ),
+                //'apcTimeOut'      => 20,
+                'memCache' => array(
+                    'class' => 'Rindow\Stdlib\Cache\SimpleCache\ArrayCache',
+                ),
+                'fileCache' => array(
+                    'class' => 'Rindow\Stdlib\Cache\SimpleCache\ArrayCache',
+                ),
+            ),
+        );
+        return $config;
     }
 
     public function testArrayReplaceRecursive()
@@ -81,6 +103,7 @@ class Test extends TestCase
                 'modules' => array(
                     'AcmeTest\Module1\Module' => true,
                 ),
+                'enableCache' => false,
             ),
             'global_config' => array(
                 'global'    => 'This is global',
@@ -101,6 +124,7 @@ class Test extends TestCase
                     'AcmeTest\Module1\Module' => true,
                     'AcmeTest\Module2\Module' => true,
                 ),
+                'enableCache' => false,
             ),
             'global_config' => array(
                 'global'    => 'This is global',
@@ -125,6 +149,7 @@ class Test extends TestCase
                 'modules' => array(
                     'AcmeTest\None\Module' => true,
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -140,6 +165,7 @@ class Test extends TestCase
         $config = array(
             'module_manager' => array(
                 'modules' => null,
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -155,6 +181,7 @@ class Test extends TestCase
         $config = array(
             'module_manager' => array(
                 'modules' => 'abc',
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -170,6 +197,7 @@ class Test extends TestCase
         $config = array(
             'module_manager' => array(
                 'modules' => new stdClass(),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -183,6 +211,7 @@ class Test extends TestCase
                 'modules' => array(
                     'AcmeTest\Module1\Module' => true,
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -219,6 +248,7 @@ class Test extends TestCase
                 'modules' => array(
                     'AcmeTest\Module1\Module' => true,
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -236,6 +266,7 @@ class Test extends TestCase
                 'modules' => array(
                     'AcmeTest\Module1\Module' => true,
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -250,6 +281,7 @@ class Test extends TestCase
                     'AcmeTest\Module1\Module' => true,
                     'AcmeTest\Module2\Module' => true,
                 ),
+                'enableCache' => false,
             ),
             'global_config' => array(
                 'execute'    => 'moduleTestRunNormal',
@@ -270,6 +302,7 @@ class Test extends TestCase
                 'invokables' => array(
                     'AcmeTest\Module2\Module' => 'self',
                 ),
+                'enableCache' => false,
             ),
             'global_config' => array(
                 'execute'    => 'moduleTestRunNormal',
@@ -290,6 +323,7 @@ class Test extends TestCase
                 'invokables' => array(
                     'AcmeTest\Module2\Module' => 'AcmeTest\Module2\AutorunTestInjection',
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -309,6 +343,7 @@ class Test extends TestCase
                         'class' => 'AcmeTest\Module2\AutorunTestInjection',
                     ),
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -328,6 +363,7 @@ class Test extends TestCase
                         'class' => 'AcmeTest\Module2\AutorunTest',
                     ),
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -352,6 +388,7 @@ class Test extends TestCase
                         'method' => 'none',
                     ),
                 ),
+                'enableCache' => false,
             ),
         );
         $moduleManager = new ModuleManager($config);
@@ -366,6 +403,7 @@ class Test extends TestCase
                     'AcmeTest\Module1\Module' => true,
                     'AcmeTest\Module2\Module' => true,
                 ),
+                'enableCache' => false,
             ),
             'global_config' => array(
                 'execute'    => 'moduleTestRunGetServiceLocator',
@@ -421,6 +459,7 @@ class Test extends TestCase
                         'config_injector' => 'setConfig',
                     ),
                 ),
+                'enableCache' => false,
             ),
             'service_manager' => array(
                 'factories' => array(
@@ -444,6 +483,7 @@ class Test extends TestCase
                 'filters' => array(
                     __NAMESPACE__.'\TestFilter::doSomething'
                 ),
+                'enableCache' => false,
             ),
             'testconfig' => array(
                 'something' => 'foo',
@@ -457,6 +497,7 @@ class Test extends TestCase
                 'filters' => array(
                     __NAMESPACE__.'\TestFilter::doSomething'
                 ),
+                'enableCache' => false,
             ),
             'testconfig' => array(
                 'something' => 'foo',
@@ -468,41 +509,45 @@ class Test extends TestCase
 
     public function testConfigCache()
     {
-        $notRegister = \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
+        $cacheConfig = $this->getCacheConfig();
+        $cacheFactory = new ConfigCacheFactory($cacheConfig['cache']);
+
         $config = array(
             'module_manager' => array(
                 'modules' => array(
                 ),
+                //'enableCache' => true, // Default=true
             ),
             'testconfig' => array(
                 'something' => 'foo',
             ),
         );
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
 
         $moduleManager = new ModuleManager(array(
             'module_manager' => array(
                 'modules' => array(
                 ),
+                //'enableCache' => true, // Default=true
             ),
         ));
+        $moduleManager->setConfigCacheFactory($cacheFactory);
 
         $this->assertEquals($config,$moduleManager->getConfig());
-
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = $notRegister;
     }
 
     public function testCheckDependencyWithoutVersion()
     {
-        $notRegister = \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
+        $cacheConfig = $this->getCacheConfig();
+        $cacheFactory = new ConfigCacheFactory($cacheConfig['cache']);
         $config = array(
             'module_manager' => array(
                 'modules' => array(
                     __NAMESPACE__.'\\TestCheckDependencyModule'=>true,
                 ),
+                //'enableCache' => true, // Default=true
             ),
             'testconfig' => array(
                 'something' => 'foo',
@@ -511,27 +556,28 @@ class Test extends TestCase
 
         TestCheckDependencyModule::$checked = false;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertTrue(TestCheckDependencyModule::$checked);
 
         TestCheckDependencyModule::$checked = false;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertFalse(TestCheckDependencyModule::$checked);
-
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = $notRegister;
     }
 
     public function testCheckDependencyWithVersion()
     {
-        $notRegister = \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = false;
+        $cacheConfig = $this->getCacheConfig();
+        $cacheFactory = new ConfigCacheFactory($cacheConfig['cache']);
         $config = array(
             'module_manager' => array(
                 'modules' => array(
                     __NAMESPACE__.'\\TestCheckDependencyModule'=>true,
                 ),
                 'version' => 1,
+                //'enableCache' => true, // Default=true
             ),
             'testconfig' => array(
                 'something' => 'foo',
@@ -540,25 +586,27 @@ class Test extends TestCase
 
         TestCheckDependencyModule::$checked = false;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertTrue(TestCheckDependencyModule::$checked);
 
         TestCheckDependencyModule::$checked = false;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertFalse(TestCheckDependencyModule::$checked);
 
         TestCheckDependencyModule::$checked = false;
         $config['module_manager']['version'] = 2;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertTrue(TestCheckDependencyModule::$checked);
 
         TestCheckDependencyModule::$checked = false;
         $moduleManager = new ModuleManager($config);
+        $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertFalse(TestCheckDependencyModule::$checked);
-
-        \Rindow\Stdlib\Cache\CacheFactory::$notRegister = $notRegister;
     }
 }

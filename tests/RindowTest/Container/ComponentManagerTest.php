@@ -3,6 +3,7 @@ namespace RindowTest\Container\ComponentManagerTest;
 
 use PHPUnit\Framework\TestCase;
 use Rindow\Annotation\AnnotationManager;
+use Rindow\Stdlib\Cache\ConfigCache\ConfigCacheFactory;
 
 // Test Target Classes
 use Rindow\Container\ComponentDefinitionManager;
@@ -18,16 +19,6 @@ class Test extends TestCase
 
     public function setUp()
     {
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-    }
-
-    public function testCache()
-    {
-        $this->markTestIncomplete(
-            'Should test on cache'
-        );
     }
 
     public function testConfig()
@@ -134,12 +125,20 @@ class Test extends TestCase
         $this->assertEquals($alias, $mgr->resolveAlias($alias));
     }
 
+    public function testCache()
+    {
+        $this->markTestIncomplete(
+            'Should test on cache'
+        );
+    }
+
     public function testNamedComponentWithCache()
     {
-        $annotaionManager = new AnnotationManager();
-        $mgr = new ComponentDefinitionManager();
+        $factory = new ConfigCacheFactory(array('enableCache'=>false));
+
+        $annotaionManager = new AnnotationManager($factory);
+        $mgr = new ComponentDefinitionManager('path',$factory);
         $mgr->setAnnotationManager($annotaionManager);
-        $mgr->setEnableCache(true);
         $mgr->setConfig(array());
         $componentScanner = new ComponentScanner();
         $componentScanner->setAnnotationManager($annotaionManager);
@@ -158,10 +157,9 @@ class Test extends TestCase
         $this->assertEquals(false,$mgr->getComponent('AcmeTest\DiContainer\Component\ModelX'));
 
         // ================== cached =============
-        $annotaionManager = new AnnotationManager();
-        $mgr = new ComponentDefinitionManager();
+        $annotaionManager = new AnnotationManager($factory);
+        $mgr = new ComponentDefinitionManager('path',$factory);
         $mgr->setAnnotationManager($annotaionManager);
-        $mgr->setEnableCache(true);
         $mgr->setConfig(array());
         $componentScanner = new ComponentScanner();
         $componentScanner->setAnnotationManager($annotaionManager);
@@ -185,7 +183,6 @@ class Test extends TestCase
         $annotaionManager = new AnnotationManager();
         $mgr = new ComponentDefinitionManager();
         $mgr->setAnnotationManager($annotaionManager);
-        $mgr->setEnableCache(false);
         $mgr->setConfig(array());
         $componentScanner = new ComponentScanner();
         $componentScanner->setAnnotationManager($annotaionManager);
@@ -211,7 +208,6 @@ class Test extends TestCase
     public function testInvalidScanDirectory()
     {
         $mgr = new ComponentDefinitionManager();
-        $mgr->setEnableCache(false);
         $mgr->setConfig(array());
         $componentScanner = new ComponentScanner();
         $componentScanner->setAnnotationManager(new AnnotationManager());

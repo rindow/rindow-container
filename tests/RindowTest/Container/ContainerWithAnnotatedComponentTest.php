@@ -36,9 +36,6 @@ class Test extends TestCase
 
     public function setUp()
     {
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
-        \Rindow\Stdlib\Cache\CacheFactory::clearCache();
-        usleep( RINDOW_TEST_CLEAR_CACHE_INTERVAL );
     }
 
     public function getConfig()
@@ -49,6 +46,7 @@ class Test extends TestCase
                     'Rindow\\Container\\Module'=>true,
     			),
 		        'annotation_manager' => true,
+                'enableCache' => false,
     		),
     		'container' => array(
     			'component_paths' => array(
