@@ -146,7 +146,8 @@ class ModuleManager
                 throw $e;
             }
         }
-        $this->getVersionCache()->set('version',$currentVersion);
+        if($lastVersion!=$currentVersion)
+            $this->getVersionCache()->set('version',$currentVersion);
         return $this->mergedConfig;
     }
 
