@@ -7,12 +7,12 @@
     "require": {
         "php": ">=5.3.3",
         "psr/container": "^1.0",
-        "rindow/rindow-stdlib": "*",
+        "rindow/rindow-stdlib": "1.*",
         "interop-phpobjects/lenient-container": "*"
     },
     "require-dev": {
-        "rindow/rindow-stdlib": "*",
-        "rindow/rindow-annotation": "*",
+        "rindow/rindow-stdlib": "1.*",
+        "rindow/rindow-annotation": "1.*",
         "interop-phpobjects/lenient-container": "*"
     },
     "suggest": {

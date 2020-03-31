@@ -11,3 +11,6 @@ $loader->add('AcmeTest\\Module2\\', __DIR__ . '/resources');
 if(!class_exists('PHPUnit\Framework\TestCase')) {
     include __DIR__.'/travis/patch55.php';
 }
+if(getenv('TRAVIS_SKIP_TEST')) {
+    define('TRAVIS_SKIP_TEST', true);
+}
