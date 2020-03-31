@@ -29,9 +29,18 @@ class Param0Ann implements Param0Interface
 
 class TestProxyManager implements ProxyManager
 {
-    public function newProxy(Container $container,ComponentDefinition $component)
+    public $awakened = 0;
+    public $container;
+    public $component;
+    public $proxyOptions;
+    public $returnValue;
+    public function newProxy(Container $container,ComponentDefinition $component,$proxyOptions=null)
     {
-        # code...
+        $this->awakened++;
+        $this->container = $container;
+        $this->component = $component;
+        $this->proxyOptions = $proxyOptions;
+        return $this->returnValue;
     }
 }
 
@@ -47,17 +56,6 @@ class Test  extends TestCase
 
     public function setUp()
     {
-    }
-
-    public function createTestMock($className,$methods = array(), array $arguments = array())
-    {
-        $args = func_get_args();
-        if(count($args)==0 || count($args)>3)
-            throw new \Exception('illegal mock style');
-        $builder = $this->getMockBuilder($className);
-        $builder->setMethods($methods);
-        $builder->setConstructorArgs($arguments);
-        return $builder->getMock();
     }
 
     public function testGetProxyMode()
@@ -87,12 +85,11 @@ class Test  extends TestCase
             'implicit_component' => true,
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->never())
-                ->method('newProxy');
+        $proxyManager = new TestProxyManager();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0',get_class($i));
+        $this->assertEquals(0,$proxyManager->awakened);
     }
 
     public function testComponentAutoProxyDefault()
@@ -104,19 +101,14 @@ class Test  extends TestCase
             ),
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->once())
-                ->method('newProxy')
-                ->with($this->equalTo($di),
-                    $this->callback(function($component) {
-                        if($component->getName()==__NAMESPACE__.'\Param0')
-                            return true;
-                        return false;
-                    }))
-                ->will($this->returnValue(new Param0Proxy()));
+        $proxyManager = new TestProxyManager();
+        $proxyManager->returnValue = new Param0Proxy();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0Proxy',get_class($i));
+        $this->assertEquals(1,$proxyManager->awakened);
+        $this->assertEquals(spl_object_hash($proxyManager->container),spl_object_hash($di));
+        $this->assertEquals($proxyManager->component->getName(),__NAMESPACE__.'\Param0');
     }
 
     public function testComponentAutoProxy()
@@ -129,19 +121,14 @@ class Test  extends TestCase
             ),
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->once())
-                ->method('newProxy')
-                ->with($this->equalTo($di),
-                    $this->callback(function($component) {
-                        if($component->getName()==__NAMESPACE__.'\Param0')
-                            return true;
-                        return false;
-                    }))
-                ->will($this->returnValue(new Param0Proxy()));
+        $proxyManager = new TestProxyManager();
+        $proxyManager->returnValue = new Param0Proxy();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0Proxy',get_class($i));
+        $this->assertEquals(1,$proxyManager->awakened);
+        $this->assertEquals(spl_object_hash($proxyManager->container),spl_object_hash($di));
+        $this->assertEquals($proxyManager->component->getName(),__NAMESPACE__.'\Param0');
     }
 
     public function testAllAutoProxy()
@@ -151,19 +138,14 @@ class Test  extends TestCase
             'auto_proxy' => 'all',
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->once())
-                ->method('newProxy')
-                ->with($this->equalTo($di),
-                    $this->callback(function($component) {
-                        if($component->getName()==__NAMESPACE__.'\Param0')
-                            return true;
-                        return false;
-                    }))
-                ->will($this->returnValue(new Param0Proxy()));
+        $proxyManager = new TestProxyManager();
+        $proxyManager->returnValue = new Param0Proxy();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0Proxy',get_class($i));
+        $this->assertEquals(1,$proxyManager->awakened);
+        $this->assertEquals(spl_object_hash($proxyManager->container),spl_object_hash($di));
+        $this->assertEquals($proxyManager->component->getName(),__NAMESPACE__.'\Param0');
     }
 
     public function testExplicitAutoProxy()
@@ -177,21 +159,16 @@ class Test  extends TestCase
             ),
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->once())
-                ->method('newProxy')
-                ->with($this->equalTo($di),
-                    $this->callback(function($component) {
-                        if($component->getName()==__NAMESPACE__.'\Param0' &&
-                            $component->getProxyMode()=='interface')
-                            return true;
-                        return false;
-                    }),
-                    $this->equalTo(array('mode'=>'interface')))
-                ->will($this->returnValue(new Param0Proxy()));
+        $proxyManager = new TestProxyManager();
+        $proxyManager->returnValue = new Param0Proxy();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0Proxy',get_class($i));
+        $this->assertEquals(1,$proxyManager->awakened);
+        $this->assertEquals(spl_object_hash($proxyManager->container),spl_object_hash($di));
+        $this->assertEquals($proxyManager->component->getName(),__NAMESPACE__.'\Param0');
+        $this->assertEquals($proxyManager->component->getProxyMode(),'interface');
+        $this->assertEquals($proxyManager->proxyOptions,array('mode'=>'interface'));
     }
 
     public function testExplicitAutoProxyNone()
@@ -204,12 +181,11 @@ class Test  extends TestCase
             ),
         );
         $di = new Container($config);
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->never())
-                ->method('newProxy');
+        $proxyManager = new TestProxyManager();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0');
         $this->assertEquals(__NAMESPACE__.'\Param0',get_class($i));
+        $this->assertEquals(0,$proxyManager->awakened);
     }
 
     public function testExplicitAutoProxyAnnotation()
@@ -224,20 +200,15 @@ class Test  extends TestCase
         );
         $di = new Container($config);
         $di->setAnnotationManager(new AnnotationManager());
-        $proxyManager = $this->createTestMock(__NAMESPACE__.'\TestProxyManager');
-        $proxyManager->expects($this->once())
-                ->method('newProxy')
-                ->with($this->equalTo($di),
-                    $this->callback(function($component) {
-                        if($component->getName()==__NAMESPACE__.'\Param0Ann' &&
-                            $component->getProxyMode()==null)
-                            return true;
-                        return false;
-                    }),
-                    $this->equalTo(array('mode'=>'interface')))
-                ->will($this->returnValue(new Param0Proxy()));
+        $proxyManager = new TestProxyManager();
+        $proxyManager->returnValue = new Param0Proxy();
         $di->setProxyManager($proxyManager);
         $i = $di->get(__NAMESPACE__.'\Param0Ann');
         $this->assertEquals(__NAMESPACE__.'\Param0Proxy',get_class($i));
+        $this->assertEquals(1,$proxyManager->awakened);
+        $this->assertEquals(spl_object_hash($proxyManager->container),spl_object_hash($di));
+        $this->assertEquals($proxyManager->component->getName(),__NAMESPACE__.'\Param0Ann');
+        $this->assertEquals($proxyManager->component->getProxyMode(),null);
+        $this->assertEquals($proxyManager->proxyOptions,array('mode'=>'interface'));
     }
 }
