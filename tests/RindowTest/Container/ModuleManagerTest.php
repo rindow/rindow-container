@@ -414,7 +414,7 @@ class Test extends TestCase
         $result = $moduleManager->run('AcmeTest\Module2\Module');
 
         $smid = spl_object_hash($serviceManager);
-        $resid = spl_object_hash($result); 
+        $resid = spl_object_hash($result);
 
         $this->assertEquals($smid,$resid);
     }
@@ -440,7 +440,7 @@ class Test extends TestCase
         $serviceManager = $moduleManager->getServiceLocator();
         $im = $di->getServiceManager();
         $smid = spl_object_hash($serviceManager);
-        $imid = spl_object_hash($im); 
+        $imid = spl_object_hash($im);
 
         $this->assertEquals($smid,$imid);
     }
@@ -481,7 +481,7 @@ class Test extends TestCase
                 'modules' => array(
                 ),
                 'filters' => array(
-                    __NAMESPACE__.'\TestFilter::doSomething'
+                    __NAMESPACE__.'\TestFilter::doSomething'=>true,
                 ),
                 'enableCache' => false,
             ),
@@ -495,7 +495,7 @@ class Test extends TestCase
                 'modules' => array(
                 ),
                 'filters' => array(
-                    __NAMESPACE__.'\TestFilter::doSomething'
+                    __NAMESPACE__.'\TestFilter::doSomething'=>true,
                 ),
                 'enableCache' => false,
             ),
@@ -608,5 +608,39 @@ class Test extends TestCase
         $moduleManager->setConfigCacheFactory($cacheFactory);
         $this->assertEquals($config,$moduleManager->getConfig());
         $this->assertFalse(TestCheckDependencyModule::$checked);
+    }
+
+    public function testImports()
+    {
+        $config = $this->getCacheConfig();
+        $config = array_replace_recursive($config,array(
+            'module_manager' => array(
+                'modules' => array(
+                    'Foo\Bar\Module' => true,
+                ),
+                'imports' => array(
+                    __DIR__.'/../../resources/imports/modules' => '@\.php$@',
+                ),
+            ),
+        ));
+        $moduleManager = new ModuleManager($config);
+        $margedConfig = $moduleManager->getConfig();
+
+        $config = $this->getCacheConfig();
+        $namespace = 'AcmeTest\\Module1';
+        $result = require __DIR__.'/../../resources/AcmeTest/Module1/Resources/config/module.config.php';
+        $config = array_replace_recursive($result,$config);
+        $config = array_replace_recursive(array(
+            'module_manager' => array(
+                'modules' => array(
+                    'Foo\Bar\Module' => false,
+                    'AcmeTest\Module1\Module' => true,
+                ),
+                'imports' => array(
+                    __DIR__.'/../../resources/imports/modules' => '@\.php$@',
+                ),
+            ),
+        ),$config);
+        $this->assertEquals($config,$margedConfig);
     }
 }

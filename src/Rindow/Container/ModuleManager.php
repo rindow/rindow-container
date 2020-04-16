@@ -69,6 +69,17 @@ class ModuleManager
         return $this->cachedConfig;
     }
 
+    public function _mergeModuleNames($names)
+    {
+        if(isset($this->config['module_manager']['modules'])) {
+            $config = $this->config['module_manager']['modules'];
+        } else {
+            $config = array();
+        }
+        $config = array_replace_recursive($config,$names);
+        $this->config['module_manager']['modules'] = $config;
+    }
+
     public function _getModules()
     {
         return $this->modules;
@@ -79,7 +90,7 @@ class ModuleManager
         return $this->config;
     }
 
-    protected function loadModules()
+    public function _loadModules()
     {
         if($this->modules!==null)
             return;
@@ -110,7 +121,7 @@ class ModuleManager
             !is_array($config['module_manager']['filters']))
             return $config;
         $filters = $config['module_manager']['filters'];
-        foreach ($filters as $filter) {
+        foreach ($filters as $filter => $switch) {
             if(!is_callable($filter))
                 throw new Exception\DomainException('a filter is not callable: '.$filter);
             $config = call_user_func($filter,$config);
@@ -122,8 +133,6 @@ class ModuleManager
     {
         if($this->mergedConfig)
             return $this->mergedConfig;
-
-        $this->loadModules();
 
         $lastVersion = $this->getVersionCache()->get('version','FIRSTLOAD');
         $currentVersion = isset($this->config['module_manager']['version'])
@@ -177,7 +186,17 @@ class ModuleManager
     {
         $generator = function ($key,$args) {
             list($moduleManager) = $args;
+            $imports = $moduleManager->_getImports();
+            if(isset($imports['module_manager']['modules'])) {
+                $names = $imports['module_manager']['modules'];
+                if(!is_array($names))
+                    throw new Exception\DomainException('Invalid module names in the imports.');
+                $moduleManager->_mergeModuleNames($names);
+            }
+
+            $moduleManager->_loadModules();
             $modules = $moduleManager->_getModules();
+
             if($modules===null)
                 throw new Exception\DomainException('Modules are not loaded.');
             $tmpConfig = array();
@@ -186,11 +205,18 @@ class ModuleManager
                     $tmpConfig = array_replace_recursive($tmpConfig, $module->getConfig());
             }
             $tmpConfig = array_replace_recursive($tmpConfig,$moduleManager->_getConfig());
-            $tmpConfig = array_replace_recursive($tmpConfig,$moduleManager->_getImports());
+            $tmpConfig = array_replace_recursive($tmpConfig,$imports);
             $config = $moduleManager->applyFilters($tmpConfig);
             return $config;
         };
-        return $this->getCachedConfig()->getEx('staticConfig',$generator,array($this));
+        $config = $this->getCachedConfig()->getEx('staticConfig',$generator,array($this));
+        if(isset($config['module_manager']['modules'])) {
+            $this->config['module_manager']['modules'] = $config['module_manager']['modules'];
+        }
+        if($this->modules===null) {
+            $this->_loadModules();
+        }
+        return $config;
     }
 
     protected function getConfigClosure()
@@ -264,7 +290,7 @@ class ModuleManager
         if($instanceManager==null) {
             if(!class_exists($annotationManagerClass))
                 throw new Exception\DomainException('annotationManager class not found:'.$annotationManagerClass);
-            $this->annotationManager = new $annotationManagerClass();
+            $this->annotationManager = new $annotationManagerClass($this->getConfigCacheFactory());
         } else {
             $this->annotationManager = $instanceManager->get($annotationManagerClass);
         }
@@ -288,7 +314,7 @@ class ModuleManager
             $config = $config['aop'];
         else
             $config = array();
-        $this->aopManager = new $className($serviceContainer);
+        $this->aopManager = new $className($serviceContainer,null,null,null,$this->getConfigCacheFactory());
         $this->aopManager->setConfig($config);
         $serviceContainer->setProxyManager($this->aopManager);
         return $this->aopManager;
@@ -324,7 +350,7 @@ class ModuleManager
             $serviceContainer->setInstance('ConfigCacheFactory',$this->configCacheFactory);
             $serviceContainer->setInstance('SimpleCache',$this->configCacheFactory->getMemCache());
         }
- 
+
         foreach($this->modules as $module) {
             if(method_exists($module,'init'))
                 $module->init($this);
@@ -381,7 +407,7 @@ class ModuleManager
             $config_injector = $config['config_injector'];
             $instance->$config_injector($module_config);
         }
-        
+
         return $instance->$method($this);
     }
 }
